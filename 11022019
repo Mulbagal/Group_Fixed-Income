@@ -1,0 +1,262 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Sun Feb  3 22:23:10 2019
+
+@author: Harish Reddy
+"""
+
+
+##### question 1 #############
+
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from scipy.optimize import brentq
+from scipy.stats import norm
+from math import log, sqrt, exp
+from scipy.optimize import least_squares
+import statsmodels.api as sm
+from scipy.interpolate import interp1d
+
+df = pd.read_excel('IR Data.xlsx', 'IRS')  # took the first sheet of the excel
+df = df.iloc[0:11,0:3]    # this removes un-necessary data in the excel 
+df1 = df.iloc[1:11,0:3]
+
+df2 = pd.read_excel('IR Data.xlsx', 'OIS') # took the second sheet of the excel
+df2 = df2.iloc[0:11,0:3]
+
+
+ois_rate = df2['Rate']
+x1 = np.array([0.5,1,2,3,4,5,7,10,15,20,30])
+
+D0=[]  #D0 gives you all the OIS discout factors for the OIS rates given in excel
+
+for i in range(len(x1)):
+    D0.append( 1/(1+(ois_rate[i]*x1[i]))  )  #D0 gives you all the OIS discout factors for the OIS rates given in excel
+
+x = np.array([1,2,3,4,5,7,10,15,20,30])
+y = np.array(df1['Rate'])
+
+y2 = np.array(D0)   
+f_new = interp1d(x1, y2, kind='cubic')  ### this is function that interprets the OIS discount factors
+x_ = np.arange(0.5,30.5,0.5)
+D_0 = [f_new(i) for i in x_]    # this is OIS discount rates after interpolation in between 0.5 and 30 years
+
+
+f2 = interp1d(x, y, kind='cubic')
+
+xnew = np.linspace(1, 30)
+plt.plot(x, y, 'o', xnew, f2(xnew), '-')
+plt.legend(['data', 'linear', 'cubic'], loc='best')
+plt.show()
+
+list = np.arange(1, 30.5, 0.5)
+
+irs = [f2(i) for i in list]   ### this gives you all IRS rates that were interpolated between 0.5 and 30 years
+
+
+Dis = [1/(1+(0.5*df['Rate'][0]))]   ### this is our required discount factor
+
+L = [df['Rate'][0]]    
+
+X = [L[0]*D_0[0]]          # this will help us update the sum of LIBOR*Discount factor 
+
+for i in range(len(irs)):
+    
+    x = ( (irs[i]*sum(D_0[0:i+2])) - sum(X) ) / D_0[i+1]
+    
+    X.append(x*D_0[i+1])
+    
+    Dis.append(D_0[i]/(1+0.5*x))
+
+
+fig1 = plt.figure()
+ax1 = fig1.add_subplot(111)
+ax1.plot(x_,D_0)    
+ax1.set_xlabel('Time')
+ax1.set_ylabel('Discount factor - part 1 of question 1')  
+ax1.set_title('part 1 discount factors')
+
+ 
+fig2 = plt.figure()
+ax2 = fig2.add_subplot(111)
+ax2.plot(x_,Dis)    
+ax2.set_xlabel('Time')
+ax2.set_ylabel('Discount factor - part 2 of question 1')  
+ax2.set_title('part 2 discount factors')
+    
+    
+
+##################################  question 2   #################################################################
+
+df = pd.read_excel('IR Data.xlsx', 'Swaption',header=2)
+
+for i in range(len(df)):
+    
+    input_row_number = i+1
+    
+    row = input_row_number - 1  # input the row you want to compute in the 'df' dataframe
+    
+    T = int((df['Expiry'][row])[:-1]) #int((df['Expiry'][row])[:-1] # this is time you start your swap ( time to expiry)
+    
+    start = (1 + 2*(T-1)) + 1
+    
+    end  =  start + 2* int((df['Tenor'][row][:-1]))
+    
+    P = 0.5*(sum(Dis[ start : end ]))
+    
+    S=5
+     
+  
+    
+    def Black76LognormalCall(S, K, sigma,T):
+        d1 = (log(S/K)+(sigma**2/2)*T) / (sigma*sqrt(T))
+        d2 = d1 - sigma*sqrt(T)
+        return (S*norm.cdf(d1) - K*norm.cdf(d2))
+    
+    def BachelierCall(S, K, sigma, T):
+        d = (S-K)/(S*sigma*np.sqrt(T))
+        return ( (S-K)*norm.cdf(d) + (S*sigma*np.sqrt(T)*norm.pdf(d)) )
+    
+    
+
+    h = [-200,-150,-100,-50,-25,0,25,50,100,150,200]
+    
+    
+    strikes = [( int(x)/100 + S) for x in h]    # this will produce strikes in percentage
+    
+    swap_rate = df.loc[row,'-200bps':].tolist()   #row here is the input you have to give - row = 0 means it is first row in 'df' dataframe
+    
+    atm_sigma = df.loc[row,'ATM']/100   
+       
+    price_atm =  Black76LognormalCall(S, S , atm_sigma,T)*P
+    
+    atm_sigma_LN = brentq(lambda x : P*Black76LognormalCall(S, S, x, T)-price_atm,0.0001,1)
+    
+    atm_sigma_N = brentq(lambda x : P*BachelierCall(S,S,x,T)-price_atm,0.0001,1)
+    
+    betas = [0.2,0.4,0.6,0.8,1]
+    
+    
+    col_names = ['strike','beta_0.2','beta_0.4','beta_0.6','beta_0.8','beta_1']
+    
+    Df = pd.DataFrame(columns=col_names)
+    
+    Df['strike'] = strikes
+    
+    
+    
+    for beta in betas:
+        
+        c = 'beta_' + str(np.round(beta,1))
+       
+        for i in range(len(Df)):
+            
+            K = Df.loc[i,'strike']
+            
+            price = P*Black76LognormalCall(S/beta, (K+((1-beta)*S/beta)), atm_sigma_LN*beta, T)
+            
+            #Df.loc[i,c] =  impliedCallVolatilityX(S, K, price, T)
+            
+            H = lambda x : P*Black76LognormalCall(S/beta, (K+((1-beta)*S/beta)), x, T)-price
+           
+            Df.loc[i,c] = (100*brentq(H,0.0001,1))/beta
+            
+            
+    imv_N=[]
+    
+        
+    for K in strikes:
+        
+            
+            price =  P*BachelierCall(S, K, atm_sigma_N,T)
+            
+            H = lambda x :  P*BachelierCall(S,K,x,T)-price
+            
+            imv_N.append(100*brentq(H,-0.0001,1))    
+    
+    
+    Df['Normal implied Vol'] = imv_N 
+       
+    Df['Market_IV'] = swap_rate
+    
+    
+    
+    def SABR(F, K, T, alpha, beta, rho, nu):
+        X = K
+        if F == K:
+            numer1 = (((1 - beta)**2)/24)*alpha*alpha/(F**(2 - 2*beta))
+            numer2 = 0.25*rho*beta*nu*alpha/(F**(1 - beta))
+            numer3 = ((2 - 3*rho*rho)/24)*nu*nu
+            VolAtm = alpha*(1 + (numer1 + numer2 + numer3)*T)/(F**(1-beta))
+            sabrsigma = VolAtm
+        else:
+            z = (nu/alpha)*((F*X)**(0.5*(1-beta)))*np.log(F/X)
+            zhi = np.log((((1 - 2*rho*z + z*z)**0.5) + z - rho)/(1 - rho))
+            numer1 = (((1 - beta)**2)/24)*((alpha*alpha)/((F*X)**(1 - beta)))
+            numer2 = 0.25*rho*beta*nu*alpha/((F*X)**((1 - beta)/2))
+            numer3 = ((2 - 3*rho*rho)/24)*nu*nu
+            numer = alpha*(1 + (numer1 + numer2 + numer3)*T)*z
+            denom1 = ((1 - beta)**2/24)*(np.log(F/X))**2
+            denom2 = (((1 - beta)**4)/1920)*((np.log(F/X))**4)
+            denom = ((F*X)**((1 - beta)/2))*(1 + denom1 + denom2)*zhi
+            sabrsigma = numer/denom
+    
+        return sabrsigma
+    
+    def sabrcalibration(x, strikes, vols, F, T):
+        err = 0.0
+        for i, vol in enumerate(vols):
+            err += (vol - SABR(F, strikes[i], T,
+                               x[0], 0.8, x[1], x[2]))**2
+    
+        return err
+    
+    
+    initialGuess = [0.02, 0.2, 0.1]
+    
+    Df['Market_IV_indecimal'] = Df['Market_IV']/100
+    
+    res = least_squares(lambda x: sabrcalibration(x,
+                                                  Df['strike'],
+                                                  Df['Market_IV_indecimal'],
+                                                  S,
+                                                  T),
+                        initialGuess)
+    
+    alpha = res.x[0]
+    beta = 0.8
+    rho = res.x[1]
+    nu = res.x[2]
+    
+    for i in range(len(Df)):
+        Df.loc[i, 'SABR IV'] = SABR(S, Df.loc[i, 'strike'], T, alpha, beta, rho, nu)*100
+    
+    
+    fig3 = plt.figure(figsize=(14,10))
+    
+    ax3 = fig3.add_subplot(111)
+    ax3.plot(strikes,Df['beta_1'],linewidth=3.0)   
+    ax3.plot(strikes,Df['Market_IV'],linewidth=3.0) 
+    ax3.plot(strikes,Df['Normal implied Vol'],linewidth=3.0)
+    ax3.plot(strikes,Df['SABR IV'],linewidth=3.0)    
+    ax3.set_xlabel('strikes')
+    ax3.set_ylabel('Implied volatilty')  
+    
+    plt.legend()
+    plt.show()    
+           
+    print('Below Data frame has all Implied Volatility for different beta')
+    print(Df)
+    
+    print('alpha:',alpha)
+    print('rho:',rho)
+    print('nu:',nu)
+
+
+
+
+p_N = [P*BachelierCall(S, K, atm_sigma_N,T) for K in strikes]
+beta =1
+p_LN = [P*Black76LognormalCall(S/beta, (K+((1-beta)*S/beta)), atm_sigma_LN*beta, T) for K in strikes]
