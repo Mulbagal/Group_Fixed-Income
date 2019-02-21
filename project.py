@@ -194,6 +194,8 @@ nu_values = []
 
 optimum =[]
 
+sigma_SABR=[]  ### Calculates at the money volatility ( corresponding to SABR model)
+
 for i in range(len(df)):
     
     input_row_number = i+1
@@ -241,6 +243,8 @@ for i in range(len(df)):
     
     def Implied_Vol_Displaced(S,K,T,beta,sigma):
         
+        atm_sigma = sigma
+                        
         price = P*Displaced_diffusion(S,K,atm_sigma,T,beta)
         
         H = lambda x : P*Black76LognormalCall(S, K, x,T)-price
@@ -250,6 +254,8 @@ for i in range(len(df)):
         return (Volatility)
     
     def Implied_Vol_Normal(S,K,T,sigma):
+        
+        atm_sigma = sigma
         
         price =  P*BachelierCall(S, K, atm_sigma,T)
         
@@ -288,9 +294,6 @@ for i in range(len(df)):
             
             K = dff.loc[j,'strikes']
             
-            #sigma = (df.iloc[i,j+2])/100
-            
-            #sigma = atm_sigma
             
             dff.loc[j,c] =  Implied_Vol_Displaced(S,K,T,beta,atm_sigma)*100
      
@@ -322,15 +325,11 @@ for i in range(len(df)):
     for beta in betas:
         
         c = 'beta_' + str(np.round(beta,1))
-              
-       
+                     
         for r in range(len(Df)):
             
             K = Df.loc[r,'strike']
             
-            #sigma = (df.iloc[i,j+2])/100
-            
-            #sigma = atm_sigma
             
             Df.loc[r,c] =  Implied_Vol_Displaced(S,K,T,beta,atm_sigma)*100
             
@@ -339,9 +338,6 @@ for i in range(len(df)):
         
         K = Df.loc[o,'strike']
         
-        #sigma = df.iloc[i,j+2]/100
-        
-        #sigma = atm_sigma
         
         Df.loc[o,'Normal implied Vol'] = (Implied_Vol_Normal(S,K,T,atm_sigma))*100
                         
@@ -407,6 +403,7 @@ for i in range(len(df)):
     for i in range(len(Df)):
         Df.loc[i, 'SABR IV'] = SABR(S, Df.loc[i, 'strike'], T, alpha, beta, rho, nu)*100
     
+    sigma_SABR.append(Df['SABR IV'][5])
     
     fig3 = plt.figure(figsize=(14,10))
     
@@ -462,7 +459,7 @@ for K in strikes:
     P = 0.5*(sum(LD[ start : end ]))
     
         
-    beta = 0.8 
+    beta = 0.4 
     
     alpha = alpha_values[9] + 0.75*(alpha_values[4]-alpha_values[9])
     
@@ -494,7 +491,7 @@ for K in strikes:
     
     
     
-    beta =  0.8 
+    beta =  0.4
     
     
     alpha = alpha_values[14] + 0.4*(alpha_values[9]-alpha_values[14])
@@ -514,6 +511,8 @@ print(prices_2year)
 
 print("Prices for swaption with 8 year maturity")
 print(prices_8year)   
+
+
 
 
 
