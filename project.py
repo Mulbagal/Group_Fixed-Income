@@ -405,20 +405,20 @@ for i in range(len(df)):
     
     sigma_SABR.append(Df['SABR IV'][5])
     
-    fig3 = plt.figure(figsize=(14,10))
-    
-    ax3 = fig3.add_subplot(111)
-    
-    ax3.plot(strikes,Df['beta_0.4'],linewidth=3.0)  
-    
-    ax3.plot(strikes,Df['beta_0.2'],linewidth=3.0)
-    
-    ax3.plot(strikes,Df['beta_0.6'],linewidth=3.0)  
-    
-    ax3.plot(strikes,Df['beta_0.8'],linewidth=3.0)  
-    
-    ax3.plot(strikes,Df['beta_1'],linewidth=3.0)  
-    
+#    fig3 = plt.figure(figsize=(14,10))
+#    
+#    ax3 = fig3.add_subplot(111)
+#    
+#    ax3.plot(strikes,Df['beta_0.4'],linewidth=3.0)  
+#    
+#    ax3.plot(strikes,Df['beta_0.2'],linewidth=3.0)
+#    
+#    ax3.plot(strikes,Df['beta_0.6'],linewidth=3.0)  
+#    
+#    ax3.plot(strikes,Df['beta_0.8'],linewidth=3.0)  
+#    
+#    ax3.plot(strikes,Df['beta_1'],linewidth=3.0)  
+#    
     
     
      
@@ -514,6 +514,152 @@ print(prices_8year)
 
 
 
+##################### question 3################################
+# Q2.
+
+from scipy.integrate import quad
+
+# Required steps are :
+# 1. Have functions for B76 put and call
+# 2. Create the IRR function
+# 3. Create the IRR' function
+# 4. Create the IRR'' function
+# 5. Create the h''(K) function
+# 6. Create the CMS Rate function
+
+#Vanilla call with Black76 lognormal model
+def vanilla_call_B76_13(F, K, T, sigma): 
+    d1 = (np.log (F / K) + (0.5 * (sigma ** 2) )* T ) / (sigma * np.sqrt(T)) 
+    d2 = d1 - sigma * np.sqrt(T) 
+    van_call_b76_13 = (F * norm.cdf(d1, 0.0, 1.0) - K * norm.cdf(d2, 0.0, 1.0))   
+    return van_call_b76_13    
+
+#Vanilla put with Black76 lognormal model
+def vanilla_put_B76_14(F, K, T, sigma): 
+    d1 = (np.log (F / K) + (0.5 * (sigma ** 2) )* T ) / (sigma * np.sqrt(T)) 
+    d2 = d1 - sigma * np.sqrt(T) 
+    van_put_b76_14 = (K * norm.cdf(-d2, 0.0, 1.0) - F * norm.cdf(-d1, 0.0, 1.0))   
+    return van_put_b76_14 
+
+# Create a dataframe with all the corresponding inputs: 
+# columns are : swaption_name, swaption forward rate, sigma_SABR, T
+    
+swaption_name = [ "1y x 1y"
+                 ,"1y x 2y"
+                 ,"1y x 3y"
+                 ,"1y x 5y"
+                 ,"1y x 10y"
+                 ,"5y x 1y"
+                 ,"5y x 2y"
+                 ,"5y x 3y"
+                 ,"5y x 5y"
+                 ,"5y x 10y"
+                 ,"10y x 1y"
+                 ,"10y x 2y"
+                 ,"10y x 3y"
+                 ,"10y x 5y"
+                 ,"10y x 10y"]
+
+T_list = 5 * [1] + 5 * [5] + 5 * [10]
+
+swap_fwd_rate_list = [ swap_1y1y
+                      ,swap_1y2y
+                      ,swap_1y3y
+                      ,swap_1y5y
+                      ,swap_1y10y
+                      ,swap_5y1y
+                      ,swap_5y2y
+                      ,swap_5y3y
+                      ,swap_5y5y
+                      ,swap_5y10y
+                      ,swap_10y1y
+                      ,swap_10y2y
+                      ,swap_10y3y
+                      ,swap_10y5y
+                      ,swap_10y10y]
+
+sigma_SABR_in = [ i / 100 for i in sigma_SABR ]
 
 
- 
+tenor = [int((df['Tenor'][row][:-1])) for row in range(len(df))]
+
+
+df_q3_2_input = pd.DataFrame({'swaption_name': swaption_name ,
+                              'swap_fwd_rate_list': swap_fwd_rate_list , 
+                              'sigma_SABR_in': sigma_SABR_in ,
+                              'T_list': T_list,
+                              'Tenor' : tenor})
+    
+# IRR Function:
+
+    
+def IRR ( expiry , delta, S ):
+    
+    #r = 1 / (1 + delta * S)
+    
+    #result = delta * ( r * ( 1 - r ** expiry) / ( 1 - r ) )
+    
+    result = (1-(1/((1+delta*S)**expiry)))/S
+    
+    return result
+
+# IRR' Function:
+    
+def IRR_dif (expiry , delta, S):
+    
+    #r = 1 / (1 + delta * S)
+    
+    #result = delta * ( ( 1 / ( 1 - r ) ) - ( r / ( ( 1 - r ) ** 2) ) - ( ( expiry - 1 ) * ( ( 1 - r ) ** ( expiry - 2 ) ) ) )
+    result = (-1/(S**2)) + (1/((S**2)*((1+delta*S)**expiry)))  + (expiry*delta)/((S)*((1+delta*S)**(expiry+1)))
+    return result
+
+# IRR'' Function:
+    
+def IRR_dif_dif (expiry , delta, S):
+    
+    #r = 1 / (1 + delta * S)
+    
+    #result = delta * ( ( 2 * r / ( ( 1 - r ) ** 3) ) + ( ( expiry - 1 ) * ( expiry - 2 ) * ( ( 1 - r ) ** ( expiry - 3 ) ) ) )
+    result = (2/(S**3)) + (-2/((S**3)*((1+delta*S)**expiry)))  + (-expiry*delta)/((S**2)*((1+delta*S)**(expiry+1)))  + (expiry*delta)*((-1/((S**2)*((1+delta*S)**(expiry+1)))  + (-(expiry+1)*delta)/((S**2)*((1+delta*S)**(expiry+2)))))
+    return result
+
+# h''(K) Function:
+    
+def h_dif_dif (expiry , delta , K):
+    
+    result =  ( ( ( -1*K* IRR_dif_dif (expiry , delta , K) ) - ( 2 * IRR_dif (expiry , delta , K) ) ) / (( IRR (expiry , delta , K) ) ** 2) ) + ( ( 2 *  ( ( IRR_dif (expiry , delta , K) ) ** 2 ) * K ) / ( IRR (expiry , delta , K )  ** 3 ) ) 
+    
+    return result
+
+# CMS Rate:
+    
+def cms_calc (expiry , delta , sigma , F,T):
+      
+    I2_rec = quad(lambda x: h_dif_dif ( expiry , delta , x) * IRR (expiry , delta , F) * vanilla_put_B76_14 ( F, x, T, sigma ) , 0 , F )
+    I2_pay = quad(lambda x: h_dif_dif ( expiry , delta , x) * IRR (expiry , delta , F) * vanilla_call_B76_13 ( F, x, T, sigma ) , F , np.inf )
+    
+    result = F + I2_rec[0]+ I2_pay[0]
+    return result
+
+# Run the cms calculation function for all the 15 required forward rates
+
+ref = 0
+cms_rate = []
+
+payout_freq = 2
+
+
+for i in swaption_name:
+        
+    sigma = sigma_SABR_in[ref]
+    F = swap_fwd_rate_list[ref]
+    expiry = payout_freq * tenor[ref]
+    T = T_list[ref]
+    delta = 0.5
+    
+    result = cms_calc (expiry , delta , sigma, F,T)
+    cms_rate.append(result)
+    
+    ref = ref + 1
+    
+print(cms_rate)
