@@ -22,34 +22,31 @@ from scipy.optimize import fsolve
 
 ####################################Q1################################################
 
-OIS=pd.read_excel('IR Data.xlsx')
-OIS=OIS.iloc[:,0:3]
-print(OIS)
+df = pd.read_excel('IR Data.xlsx', 'IRS')
+df = df.iloc[0:11,0:3]
+df1 = df.iloc[1:11,0:3]
 
-tenor=[0.5,1,2,3,4,5,7,10,15,20,30]
+df2 = pd.read_excel('IR Data.xlsx', 'OIS')
+df2 = df2.iloc[0:11,0:3]
 
-discount_factor=[]
-for i in range(11):
-    D=1/(1+OIS.iloc[i,2]/360)**(tenor[i]*360)
-    discount_factor.append(D)
 
-print("The OIS discount factor is",discount_factor)
 
-f1=interp1d(tenor,discount_factor) #OIS interpolation
-xnew1=np.linspace(0.5,30) #different tenor
+ois_rate = df2['Rate']
+x1 = np.array([0.5,1,2,3,4,5,7,10,15,20,30])
+D0=[]
+for i in range(len(x1)):
+    D0.append( 1/(1+(ois_rate[i]*x1[i]))  ) 
 
-OIS_D=[]
-for i in np.arange(0.5,30.5,0.5):
-    OIS_D.append(f1(i).tolist())
-    
+x = np.array([1,2,3,4,5,7,10,15,20,30])
+y = np.array(df1['Rate'])
 
-print("---------------------------------------------------------------")
-fig1=plt.figure()
-ax1=fig1.subplots()
-ax1.plot(xnew1,f1(xnew1),tenor,discount_factor,'o')
-ax1.set_title("OIS Discount Factor")
-ax1.set_xlabel("Time")
-ax1.set_ylabel("Discount Factor")
+y2 = np.array(D0)
+f_new = interp1d(x1, y2, kind='cubic')  ### this is function that interprets the OIS discount factors
+x_ = np.arange(0.5,30.5,0.5)
+discount_OIS = [f_new(i) for i in x_]    # this is OIS discount rates
+
+
+
 
 ###################################Q2##################################################
 
