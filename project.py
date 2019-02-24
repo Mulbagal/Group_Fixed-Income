@@ -43,7 +43,7 @@ y = np.array(df1['Rate'])
 y2 = np.array(D0)
 f_new = interp1d(x1, y2, kind='cubic')  ### this is function that interprets the OIS discount factors
 x_ = np.arange(0.5,30.5,0.5)
-discount_OIS = [f_new(i) for i in x_]    # this is OIS discount rates
+OIS_D = [f_new(i) for i in x_]    # this is OIS discount rates
 
 
 
