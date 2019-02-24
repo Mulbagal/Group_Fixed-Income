@@ -20,32 +20,32 @@ from scipy.optimize import fsolve
 ########################################## question 1*######################################
 
 
+
+
 ####################################Q1################################################
 
-df = pd.read_excel('IR Data.xlsx', 'IRS')
-df = df.iloc[0:11,0:3]
-df1 = df.iloc[1:11,0:3]
+Swaption=pd.read_excel('IR Data.xlsx','Swaption')
+Swaption
 
-df2 = pd.read_excel('IR Data.xlsx', 'OIS')
-df2 = df2.iloc[0:11,0:3]
+OIS=pd.read_excel('IR Data.xlsx','OIS')
+OIS=OIS.iloc[:,0:3]
+print(OIS)
 
+tenor=[0.5,1,2,3,4,5,7,10,15,20,30]
 
+discount_factor=[]
+for i in range(11):
+    D=1/(1+OIS.iloc[i,2]/360)**(tenor[i]*360)
+    discount_factor.append(D)
 
-ois_rate = df2['Rate']
-x1 = np.array([0.5,1,2,3,4,5,7,10,15,20,30])
-D0=[]
-for i in range(len(x1)):
-    D0.append( 1/(1+(ois_rate[i]*x1[i]))  ) 
+print("The OIS discount factor is",discount_factor)
 
-x = np.array([1,2,3,4,5,7,10,15,20,30])
-y = np.array(df1['Rate'])
+f1=interp1d(tenor,discount_factor) #OIS interpolation
+xnew1=np.linspace(0.5,30) #different tenor
 
-y2 = np.array(D0)
-f_new = interp1d(x1, y2, kind='cubic')  ### this is function that interprets the OIS discount factors
-x_ = np.arange(0.5,30.5,0.5)
-OIS_D = [f_new(i) for i in x_]    # this is OIS discount rates
-
-
+OIS_D=[]
+for i in np.arange(0.5,30.5,0.5):
+    OIS_D.append(f1(i).tolist())
 
 
 ###################################Q2##################################################
